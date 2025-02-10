@@ -14,7 +14,7 @@ struct BitcoinView: View {
     @State private var isCopied = false
     @State private var showCheckmark = false
     @State private var showingBitcoinViewErrorAlert = false
-    @State private var isReceiveSheetPresented = false
+    @State private var showReceiveViewWithOption: ReceiveOption?
     @State private var isPaymentsPresented = false
     @State private var showToast = false
     @State private var showingNodeIDView = false
@@ -164,11 +164,23 @@ struct BitcoinView: View {
                 HStack {
 
                     Button(action: {
-                        isReceiveSheetPresented = true
+                        showReceiveViewWithOption = .bip21
                     }) {
                         Image(systemName: "qrcode")
                             .font(.title)
                             .foregroundColor(.primary)
+                    }.contextMenu {
+                        Button {
+                            showReceiveViewWithOption = .bip21
+                        } label: {
+                            Label("Unified BIP21", systemImage: "bitcoinsign")
+                        }
+
+                        Button {
+                            showReceiveViewWithOption = .bolt11JIT
+                        } label: {
+                            Label("JIT Bolt11", systemImage: "bolt")
+                        }
                     }
 
                     Spacer()
@@ -241,7 +253,7 @@ struct BitcoinView: View {
             ) {
                 SettingsView(
                     viewModel: .init(
-                        appState: viewModel.$appState,
+                        walletClient: viewModel.$walletClient,
                         lightningClient: viewModel.lightningClient
                     )
                 )
@@ -279,7 +291,7 @@ struct BitcoinView: View {
                     .font(.caption2)
             }
             .sheet(
-                isPresented: $isReceiveSheetPresented,
+                item: $showReceiveViewWithOption,
                 onDismiss: {
                     Task {
                         await viewModel.getTotalOnchainBalanceSats()
@@ -289,9 +301,12 @@ struct BitcoinView: View {
                         await viewModel.getStatus()
                     }
                 }
-            ) {
-                ReceiveView(lightningClient: viewModel.lightningClient)
-                    .presentationDetents([.large])
+            ) { receiveOption in
+                ReceiveView(
+                    lightningClient: viewModel.lightningClient,
+                    selectedOption: receiveOption
+                )
+                .presentationDetents([.large])
             }
             .sheet(
                 isPresented: $isPaymentsPresented,
@@ -353,7 +368,7 @@ enum NavigationDestination: Hashable {
     #Preview {
         BitcoinView(
             viewModel: .init(
-                appState: .constant(.onboarding),
+                walletClient: .constant(WalletClient(keyClient: KeyClient.mock)),
                 priceClient: .mock,
                 lightningClient: .mock
             ),
