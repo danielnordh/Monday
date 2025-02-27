@@ -16,9 +16,10 @@ struct SettingsView: View {
     @State private var showNodeIDErrorAlert = false
     @State private var showStopNodeConfirmation = false
     @State private var showDeleteSeedConfirmation = false
+    @State private var showToggleTestData = false
 
     var body: some View {
-        NavigationView {
+        VStack {
             Form {
                 // Wallet section
                 Section {
@@ -92,6 +93,21 @@ struct SettingsView: View {
                     Text("Lightning Node").foregroundColor(.primary)
                 }
 
+                // Developer section
+                Section {
+                    Toggle(
+                        isOn: Binding(
+                            get: { viewModel.walletClient.appMode == .mock },
+                            set: { _ in
+                                showToggleTestData = true
+                            }
+                        ),
+                        label: { Label("Use mock data", systemImage: "testtube.2") }
+                    )
+                } header: {
+                    Text("Design & Develop").foregroundColor(.primary)
+                }
+
                 // Danger Zone section
                 Section {
                     Button {
@@ -133,11 +149,6 @@ struct SettingsView: View {
             .listStyle(.plain)
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") { dismiss() }
-                }
-            }
             .onAppear {
                 Task {
                     viewModel.getNodeID()
@@ -158,6 +169,21 @@ struct SettingsView: View {
                     }
                 )
             }
+            .alert("Change and restart?", isPresented: $showToggleTestData) {
+                Button("Cancel", role: .cancel) {}
+                Button("Restart") {
+                    Task {
+                        await viewModel.walletClient.restart(
+                            newNetwork: viewModel.walletClient.network,
+                            newServer: viewModel.walletClient.server,
+                            appMode: viewModel.walletClient.appMode == .mock ? .live : .mock
+                        )
+                        dismiss()
+                    }
+                }
+            } message: {
+                Text("This change requires a restart of your node.")
+            }
         }
     }
 }
@@ -166,7 +192,7 @@ struct SettingsView: View {
     #Preview {
         SettingsView(
             viewModel: .init(
-                walletClient: .constant(WalletClient(keyClient: KeyClient.mock)),
+                walletClient: .constant(WalletClient(appMode: AppMode.mock)),
                 lightningClient: .mock
             )
 
